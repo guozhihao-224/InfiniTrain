@@ -14,7 +14,10 @@
 set -euo pipefail
 
 BUILD_DIR="${1:-build}"
-FILTER='^test_generator_'
+# Matches the Generator suite test names registered by INFINI_TRAIN_REGISTER_TEST
+# (e.g. CPU/GeneratorBasicTest.*, CUDA/GeneratorDropoutOpTest.*, ModuleTrainingTest.*)
+# plus the non-parametrized CPUGeneratorImplTest fixture.
+FILTER='Generator|ModuleTrainingTest'
 
 if [[ ! -d "$BUILD_DIR" ]]; then
     echo "ERROR: build dir '$BUILD_DIR' not found" >&2
@@ -36,10 +39,13 @@ run_ctest() {
 
 # Filter to per-test verdict lines only (drop timestamps / durations).
 # Example matched line:
-#   Test #42: GeneratorSeedTest/CPU.ManualSeedReseedsState ...   Passed    0.04 sec
+#    1/33 Test #266: CPU/GeneratorBasicTest.ConstructionAttachesDevice/... Passed    0.01 sec
+# `|| true` keeps the script alive under `set -e` when the build has zero
+# matching tests; the emptiness check below produces a clearer error.
 filter_verdicts() {
-    grep -E '^[[:space:]]*Test #[0-9]+: .* (Passed|Failed|Skipped)' "$1" \
-        | sed -E 's/[[:space:]]+[0-9]+\.[0-9]+ sec$//'
+    grep -E 'Test +#[0-9]+: .*(Passed|Failed|Skipped)' "$1" \
+        | sed -E 's/[[:space:]]+[0-9]+\.[0-9]+ sec$//' \
+        || true
 }
 
 echo "[1/2] running ctest in $BUILD_DIR (filter $FILTER)"
