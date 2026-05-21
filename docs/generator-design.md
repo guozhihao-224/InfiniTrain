@@ -27,7 +27,7 @@
 
 3.2 **状态推进 trap**：连续两次同长序列必须不同。`test_seed.cc::DifferentSeedsDifferState`(L23)、`test_ops_uniform.cc::ConsecutiveCallsAdvanceState`(L40)。单线程+锁(`uniform_random.cc:22`) 修复旧 OMP 路径"每线程重新构造 mt19937 状态不推进"bug。
 
-3.3 **State 往返+跨格式拒绝**：`test_state.cc::GetSetStateRoundtrip`(L14)。CPU 校验 `cpu_only/test_state_validation.cc` 4 case `TruncatedHeader/BadMagic/BadVersion/PayloadSizeMismatch`(L27-48)；CUDA `cuda_only/test_cuda_state_validation.cc` 6 case 含 `RoundtripPreservesSeedOffsetInitialSeed`、`RejectsCpuStateBlob`(L73 cross-magic 拒喂 CPU state blob)。
+3.3 **State 往返+序列重对齐+跨格式拒绝**：`test_state.cc::GetSetStateRoundtrip` 验 blob+InitialSeed；`GetSetStateRestoresSequence` 验"draw→save→draw₁→restore→draw₂，draw₁==draw₂"（spec §三(3) 完整循环，CPU+CUDA 双实例化）。CPU 校验 `cpu_only/test_state_validation.cc` 4 case `TruncatedHeader/BadMagic/BadVersion/PayloadSizeMismatch`；CUDA `cuda_only/test_cuda_state_validation.cc` 6 case 含 `RoundtripPreservesSeedOffsetInitialSeed`、`RejectsCpuStateBlob`(cross-magic 拒喂 CPU state blob)。
 
 3.4 **InitialSeed 不被 Seed() 覆盖**：`test_initial_seed.cc::SeedDoesNotChangeInitialSeed`(L12)。`generator_impl.cc:27-32`+`cpu_generator_impl.cc:44-47`。
 
@@ -58,6 +58,6 @@
 
 ## 6. 验证清单与复现说明
 
-CUDA：`-DUSE_CUDA=ON -DUSE_NCCL=ON`；CPU-only 加 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` 兼容 gflags。运行 `ctest --test-dir <build> --output-on-failure -R '^test_generator_'`。
+CUDA：`-DUSE_CUDA=ON -DUSE_NCCL=ON`；CPU-only 加 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` 兼容 gflags。Generator suite 跑 `ctest --test-dir <build> --output-on-failure -R 'Generator|ModuleTrainingTest'`（gtest fixture 名前缀，`^test_generator_` 那种 binary-name 过滤不会命中）。
 
-期望(见 `docs/superpowers/notes/2026-05-21-phase2-pr-prep.md`)：train-server `USE_CUDA=ON` **519 pass / 10 fail / 1 skip 共 530**；Generator suite 40+ pass/0 fail/1 skip(Multi-GPU SKIP)。10 fail 是 pre-existing upstream `gemm.cu:41` DCHECK(commit `5dfd4b2e` 2026-04-15、`fd7c3a1c` 2026-05-07)。CPU-only 本地 **298 pass / 1 fail**(`third_party/glog::log_severity_conversion`)。加分项 `scripts/check_reproducibility.sh`(spec §9.1)：`./scripts/check_reproducibility.sh build`，0 表示可复现。
+期望(见 `docs/superpowers/notes/2026-05-21-phase2-pr-prep.md`)：train-server `USE_CUDA=ON` **519 pass / 10 fail / 1 skip 共 530**；Generator suite 40+ pass/0 fail/1 skip(Multi-GPU SKIP)。10 fail 是 pre-existing upstream `gemm.cu:41` DCHECK(commit `5dfd4b2e` 2026-04-15、`fd7c3a1c` 2026-05-07)。CPU-only 本地 **298 pass / 1 fail**(`third_party/glog::log_severity_conversion`)。加分项 `scripts/check_reproducibility.sh`(spec §9.1)：`./scripts/check_reproducibility.sh build`，0 表示可复现（同 filter，已封装在脚本内）。
