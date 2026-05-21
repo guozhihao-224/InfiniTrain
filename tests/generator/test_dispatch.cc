@@ -16,9 +16,6 @@ using namespace infini_train;
 class GeneratorDispatchTest : public infini_train::test::InfiniTrainTest {};
 
 TEST_P(GeneratorDispatchTest, NullGeneratorFallsBackToDefault) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA random kernels are Phase 2";
-    }
     manual_seed(13);
     auto a = std::make_shared<Tensor>(std::vector<int64_t>{8}, DataType::kFLOAT32, GetDevice());
     auto b = std::make_shared<Tensor>(std::vector<int64_t>{8}, DataType::kFLOAT32, GetDevice());

@@ -26,9 +26,6 @@ std::vector<float> ReadCpuFloats(const std::shared_ptr<Tensor> &t) {
 } // namespace
 
 TEST_P(GeneratorKaimingTest, SameSeedSameWeights) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA random kernels are Phase 2";
-    }
     auto t1 = std::make_shared<Tensor>(std::vector<int64_t>{16, 16}, DataType::kFLOAT32, GetDevice());
     auto t2 = std::make_shared<Tensor>(std::vector<int64_t>{16, 16}, DataType::kFLOAT32, GetDevice());
 
@@ -42,9 +39,6 @@ TEST_P(GeneratorKaimingTest, SameSeedSameWeights) {
 }
 
 TEST_P(GeneratorKaimingTest, FanInBoundsRespected) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA random kernels are Phase 2";
-    }
     // weight: [out=8, in=32] -> fan_in = 32, gain(LeakyReLU,a=0) = sqrt(2/(1+0.01^2))
     // std = gain / sqrt(fan_in); bound = sqrt(3) * std
     const int64_t out_dim = 8, in_dim = 32;
