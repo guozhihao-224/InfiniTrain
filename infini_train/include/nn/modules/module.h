@@ -86,6 +86,13 @@ public:
     NamedModules(std::unordered_set<Module *> *memory = nullptr, const std::string &prefix = "",
                  bool remove_duplicate = true);
 
+    // Set this module and all submodules to training mode.
+    // Recurses into every entry of modules_, including __pp_* (StateDict's
+    // __pp_* skip is a serialization-dedup invariant, not a setter invariant).
+    virtual void Train(bool mode = true);
+    void         Eval()                 { Train(false); }
+    bool         IsTraining() const     { return training_; }
+
     // Hook registration methods
     std::shared_ptr<infini_train::HookHandle> RegisterForwardPreHook(ModulePreHook hook);
     std::shared_ptr<infini_train::HookHandle> RegisterForwardPostHook(ModulePostHook hook);
@@ -93,6 +100,7 @@ public:
     std::shared_ptr<infini_train::HookHandle> RegisterBackwardPostHook(ModulePostHook hook);
 
 protected:
+    bool training_ = true;
     Device device_;
     const std::string type_ = kUndefinedType;
     std::unordered_map<std::string, std::shared_ptr<Module>> modules_;

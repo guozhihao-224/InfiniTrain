@@ -284,4 +284,14 @@ std::shared_ptr<infini_train::HookHandle> Module::RegisterBackwardPostHook(Modul
     return std::make_shared<ModuleHookHandleImpl<ModulePostHook>>(&backward_post_hooks_,
                                                                   backward_post_hooks_.size() - 1);
 }
+
+void Module::Train(bool mode) {
+    training_ = mode;
+    for (auto &kv : modules_) {
+        if (!kv.second) {
+            continue;
+        }
+        kv.second->Train(mode);
+    }
+}
 } // namespace infini_train::nn
