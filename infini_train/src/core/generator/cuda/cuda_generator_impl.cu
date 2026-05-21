@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <stdexcept>
 #include <vector>
 
 #include "glog/logging.h"

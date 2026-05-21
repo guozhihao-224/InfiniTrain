@@ -39,6 +39,6 @@ TEST(CUDAGeneratorImplTest, ReseedThroughBaseClassSeed) {
 }
 
 TEST(CUDAGeneratorImplTest, IndexOutOfRangeAborts) {
-    EXPECT_DEATH(CUDAGeneratorImpl(8), "");
-    EXPECT_DEATH(CUDAGeneratorImpl(-1), "");
+    EXPECT_DEATH(CUDAGeneratorImpl(8), "device index out of range");
+    EXPECT_DEATH(CUDAGeneratorImpl(-1), "device index out of range");
 }
