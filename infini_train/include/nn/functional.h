@@ -204,4 +204,10 @@ std::shared_ptr<Tensor> Rand(const std::vector<int64_t> &size, DataType dtype, D
 std::shared_ptr<Tensor> Randn(const std::vector<int64_t> &size, DataType dtype, Device device,
                               std::optional<Generator> generator = std::nullopt);
 
+// Functional dropout: bypasses when `training` is false; otherwise applies the same
+// Bernoulli mask + 1/(1-p) scale as nn::Dropout. Provided for use without instantiating
+// a Module (mirrors torch.nn.functional.dropout).
+std::shared_ptr<Tensor> Dropout(const std::shared_ptr<Tensor> &input, float p, bool training = true,
+                                std::optional<Generator> generator = std::nullopt);
+
 } // namespace infini_train::nn::function

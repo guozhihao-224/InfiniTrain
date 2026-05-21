@@ -8,6 +8,7 @@
 #include "glog/logging.h"
 
 #include "infini_train/include/autograd/activations.h"
+#include "infini_train/include/autograd/dropout.h"
 #include "infini_train/include/autograd/elementwise.h"
 #include "infini_train/include/autograd/misc.h"
 #include "infini_train/include/autograd/reduction.h"
@@ -105,5 +106,15 @@ std::shared_ptr<Tensor> Randn(const std::vector<int64_t> &size, DataType dtype, 
     auto impl = ResolveGenerator(generator, device);
     Dispatcher::Instance().Call<void>({device.type(), "NormalRandom"}, t, 0.0f, 1.0f, impl.get());
     return t;
+}
+
+std::shared_ptr<Tensor> Dropout(const std::shared_ptr<Tensor> &input, float p, bool training,
+                                std::optional<Generator> generator) {
+    if (!training || p == 0.0f) {
+        return input;
+    }
+    auto fn = std::make_shared<autograd::Dropout>(p, std::move(generator));
+    auto outputs = fn->Apply({input});
+    return outputs[0];
 }
 } // namespace infini_train::nn::function
