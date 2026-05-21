@@ -25,9 +25,6 @@ std::vector<float> ReadCpuFloats(const std::shared_ptr<Tensor> &t) {
 } // namespace
 
 TEST_P(GeneratorUniformOpTest, SameSeedSameOutput) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA UniformRandom is Phase 2";
-    }
     auto t1 = std::make_shared<Tensor>(std::vector<int64_t>{8}, DataType::kFLOAT32, GetDevice());
     auto t2 = std::make_shared<Tensor>(std::vector<int64_t>{8}, DataType::kFLOAT32, GetDevice());
     Generator g(GetDevice());
@@ -41,9 +38,6 @@ TEST_P(GeneratorUniformOpTest, SameSeedSameOutput) {
 }
 
 TEST_P(GeneratorUniformOpTest, ConsecutiveCallsAdvanceState) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA UniformRandom is Phase 2";
-    }
     auto t1 = std::make_shared<Tensor>(std::vector<int64_t>{8}, DataType::kFLOAT32, GetDevice());
     auto t2 = std::make_shared<Tensor>(std::vector<int64_t>{8}, DataType::kFLOAT32, GetDevice());
     Generator g(GetDevice());
@@ -54,9 +48,6 @@ TEST_P(GeneratorUniformOpTest, ConsecutiveCallsAdvanceState) {
 }
 
 TEST_P(GeneratorUniformOpTest, OutputsWithinRange) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA UniformRandom is Phase 2";
-    }
     auto t = std::make_shared<Tensor>(std::vector<int64_t>{1024}, DataType::kFLOAT32, GetDevice());
     Generator g(GetDevice());
     g.ManualSeed(2026);
