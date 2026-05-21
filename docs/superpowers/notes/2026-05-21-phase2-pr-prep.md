@@ -277,3 +277,48 @@ Phase 3+4 newcomers (all green on both backends):
 - CMake configure required `PATH=/usr/local/cuda/bin:$PATH` and `-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc` because nvcc wasn't on the non-interactive shell PATH.
 - Tests are gated by `option(BUILD_TEST OFF)` (CMakeLists.txt:7); Phase 4 re-build needed `-DBUILD_TEST=ON` after the wipe.
 - One transient parallel-build hiccup on `test_autograd_cpu` (Error 2 with no compile-error output) cleared on the next `cmake --build` invocation — standard `-j` race, not a code issue.
+
+---
+
+## 10. Empirical proof: pristine upstream master has the same 10 failures (2026-05-21)
+
+To rule out regression entirely, built **upstream `InfiniTensor:master`** at SHA `a917760` ("feat(docs): add generator abstraction design and specifications") in a separate `build-master/` tree on train-server and ran the full ctest. SHA `a917760` is the parent of every Phase 1+2+3+4 commit on this branch (`git merge-base master HEAD == a917760`), so it's the apples-to-apples baseline.
+
+Method: `git -c submodule.recurse=false read-tree --reset -u a917760` after temporarily moving aside `third_party/*/.git` gitlink files (so the broken `.git/modules/` doesn't trip git's submodule sanity checks); rsync re-populated `third_party/eigen/` afterwards (`read-tree -u` had cleared its untracked content). Build with `cmake --build build-master -j 4` (lower parallelism: `-j` triggered `c++: fatal error: Killed signal terminated program cc1plus` — host OOM, not a code issue).
+
+**Result on master `a917760` (`USE_CUDA=ON USE_NCCL=ON Debug`, `cmake -B build-master -DBUILD_TEST=ON`):**
+
+```
+98% tests passed, 10 tests failed out of 403
+Total Test time (real) = 78.86 sec
+```
+
+10 failures (verbatim):
+
+```
+210 - CUDA/AutogradForwardTest.MatmulForward
+279 - CUDA/AutogradMatmulBackwardTest.MatmulBackward
+280 - CUDA/AutogradMatmulBackwardTest.MatmulBackwardSquare
+281 - CUDA/AutogradMatmulBackwardTest.MatmulBackwardDifferentShapes
+282 - CUDA/AutogradMatmulForwardTest.MatmulForward
+283 - CUDA/AutogradMatmulForwardTest.MatmulDifferentShapes
+285 - CUDA/AutogradMatmulForwardTest.MatmulSquare
+332 - CUDA/LoRATest.LoRALinearMerge
+338 - CUDA/LoRATest.GetLoRAModel
+339 - CUDA/LoRATest.MergeAndUnload
+```
+
+All 10 abort with `gemm.cu:41] Check failed: p.stride_a == 0LL (... vs. 0)` — same DCHECK as catalogued in §2.
+
+**Comparison to feat/generator-phase1:**
+
+| Metric | master `a917760` | feat/generator-phase1 `1307669` |
+|--------|------------------|-------------------------------|
+| Total ctest size | 403 | 532 (= 534 − 2 Disabled) |
+| Pass | 393 | 510 |
+| Fail | 10 | 10 |
+| Skip | (omitted; same 0 cuda + 12 cpu group as branch) | 12 |
+
+The 10-test failure set matches **exactly** by gtest fixture/name (7 Matmul + 3 LoRA). Test numbers differ only because feat/generator-phase1 adds 129 more tests (the new generator suite). **The 10 failures pre-exist on upstream master and are not introduced by Phase 1+2+3+4.**
+
+After empirical run, train-server was restored: branch `feat/generator-phase1` reset to `1307669`, working tree restored via `git -c submodule.recurse=false read-tree --reset -u feat/generator-phase1`, submodule `.git` gitlink files moved back from `.git.bak`, eigen content re-rsynced.
