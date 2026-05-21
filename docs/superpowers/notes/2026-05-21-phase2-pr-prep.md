@@ -196,9 +196,10 @@ Only `mt19937_64` (the engine type) appears, only inside `CPUGeneratorImpl` — 
 - Phase 4: PyTorch alignment + reproducibility report at `docs/generator-design.md`, plus `scripts/check_reproducibility.sh` driving two ctest sweeps and diffing per-test verdicts.
 
 ## Test plan
-- train-server full ctest (Phase 3 cadence): 519 pass / 10 fail / 1 skip / 530 total — the 10 failures are the pre-existing `gemm.cu:41` DCHECK aborts (unrelated; see below).
-- Generator suite (Phases 1+2+3): 40+ pass / 1 skip (multi-GPU on 1-GPU host) / 0 fail across `tests/generator/` plus `ModuleTrainingTest` and `GeneratorDropoutOpTest`.
-- Local CPU-only build (USE_CUDA=OFF): `cuda_only/` excluded; `scripts/check_reproducibility.sh build_cpu` reports `PASS: 33 test outcomes match across two ctest runs` (exit 0).
+- train-server full ctest at HEAD `1307669` (USE_CUDA=ON USE_NCCL=ON Debug): **510 pass / 10 fail / 12 skip / 532 ran (534 - 2 Disabled)** — the 10 failures are the pre-existing upstream `gemm.cu:41` DCHECK aborts (unrelated; commit attribution in §2 below).
+- Generator suite alone (`-R 'Generator|ModuleTrainingTest'`): **68 pass / 0 fail / 1 skip** (multi-GPU on 1-GPU host). 34 CPU + 34 CUDA, including the new `GeneratorStateTest.GetSetStateRestoresSequence` which closes spec §三(3).
+- `scripts/check_reproducibility.sh build` on train-server CUDA build: `PASS: 68 test outcomes match across two ctest runs`, exit 0.
+- Local CPU-only build (USE_CUDA=OFF): `cuda_only/` excluded; `scripts/check_reproducibility.sh build_cpu` reports `PASS: 34 test outcomes match across two ctest runs`, exit 0.
 - Phase 4 alignment report cites file:line + test names for every claim; reproducibility script handles empty ctest output explicitly.
 
 ## Out of scope (filed/notable)
@@ -232,17 +233,47 @@ a627e9a feat(kernels/cuda): add DropoutForward/DropoutBackward (Philox, stream-b
 d2a986d feat(nn/module): add Train/Eval/IsTraining with __pp_*-inclusive recursion
 ```
 
-### Phase 3 train-server ctest (USE_CUDA=ON, USE_NCCL=ON)
+### Train-server ctest at HEAD `1307669` (Phases 1+2+3+4, USE_CUDA=ON USE_NCCL=ON Debug)
+
+Re-run on 2026-05-21 after the state-realignment test was added:
 
 ```
-519 pass / 10 fail / 1 skip out of 530
+98% tests passed, 10 tests failed out of 532
+(534 total - 2 Disabled = 532 ran; 10 fail / 12 Skipped / 510 pass)
+Total Test time (real) = 90.61 sec
 ```
 
-The 10 failures are the `gemm.cu:41` upstream DCHECK aborts catalogued in §2 — unchanged before/after Phase 3. Phase 3 newcomers all green: `ModuleTrainingTest.{4 cases}` × {CPU,CUDA} + `GeneratorDropoutOpTest.{6 cases}` × {CPU,CUDA}.
+Generator suite (filter `Generator|ModuleTrainingTest`):
+
+```
+100% tests passed, 0 tests failed out of 68
+(34 CPU + 34 CUDA; 1 multi-GPU SKIP on this 1-GPU host)
+```
+
+Reproducibility script on train-server CUDA build:
+
+```
+$ ./scripts/check_reproducibility.sh build
+PASS: 68 test outcomes match across two ctest runs
+```
+
+The 10 failures are the same `gemm.cu:41` upstream DCHECK aborts catalogued in §2 — confirmed unchanged before/after Phase 3+4 (commit attribution `5dfd4b2e`/`fd7c3a1c` predates this branch). The 12 Skipped are the multi-GPU generator test (1) + a TensorCopy multi-device test (1) + 10 CPU `TransformerModuleTest.*` (always skipped on this build).
+
+Phase 3+4 newcomers (all green on both backends):
+- `GeneratorStateTest.{GetSetStateRoundtrip,GetSetStateRestoresSequence}` ← spec §三(3) full save→draw→restore→draw cycle
+- `ModuleTrainingTest.{DefaultIsTrainingTrue,EvalRecursesIntoChildren,RecursesIntoPpPrefixedChildren,NullChildSkipped}`
+- `GeneratorDropoutOpTest.{SameSeedSameMask,MaskKeepRateSane,OutputScaleCorrect,BackwardEqualsMaskScale,EvalGateBypassesDropout,FunctionalTrainingFalseBypasses}`
 
 ### Phase 4 verification
 
 - `docs/generator-design.md`: 6-table interface comparison + behavior alignment with file:line + test name citations + 5 unaligned items + 6 future directions + verification checklist.
-- `scripts/check_reproducibility.sh build_cpu` (local): `PASS: 33 test outcomes match across two ctest runs`, exit 0.
+- `scripts/check_reproducibility.sh build_cpu` (local CPU-only): `PASS: 34 test outcomes match across two ctest runs`, exit 0.
 - Script error-path verified: stale build (no Generator tests) → `ERROR: no Generator test verdicts captured`, exit 3 (no longer aborts under pipefail).
 - Initial filter regex shipped in `9de4b0e` was wrong (`^test_generator_` matched executable names, not gtest names); fixed in follow-up `edc5265` to match `Generator|ModuleTrainingTest` + tightened verdict regex + `|| true` against empty grep. Reviewer lesson: structural `bash -n` PASS is necessary but not sufficient — script-quality review must run the script end-to-end.
+
+### Train-server build hygiene (encountered during Phase 4 re-verification)
+
+- `third_party/eigen` working tree was missing on train-server; rsync-uploaded directly (20 MB / 1800 files) since the box's network couldn't fetch the submodule. The remaining submodules (`gflags`, `glog`, `googletest`) had intact working trees; only their `.git` gitlinks were broken, which doesn't affect the build (CMake `add_subdirectory` only needs sources).
+- CMake configure required `PATH=/usr/local/cuda/bin:$PATH` and `-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc` because nvcc wasn't on the non-interactive shell PATH.
+- Tests are gated by `option(BUILD_TEST OFF)` (CMakeLists.txt:7); Phase 4 re-build needed `-DBUILD_TEST=ON` after the wipe.
+- One transient parallel-build hiccup on `test_autograd_cpu` (Error 2 with no compile-error output) cleared on the next `cmake --build` invocation — standard `-j` race, not a code issue.
