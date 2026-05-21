@@ -193,7 +193,7 @@ Only `mt19937_64` (the engine type) appears, only inside `CPUGeneratorImpl` — 
 - Phase 1: introduce Generator/GeneratorImpl PImpl, CPU backend (mt19937_64 + state header), default pool, manual_seed, ResolveGenerator, CPU UniformRandom/NormalRandom kernels, route nn::init::{Uniform,Normal,KaimingUniform} through dispatcher.
 - Phase 2: vendor PyTorch Philox4_32 (BSD-3), CUDAGeneratorImpl (seed+offset), state serialization with magic/version + cross-magic reject, CUDA UniformRandom (Philox) and NormalRandom (Box-Muller), stream-bound launches, multi-GPU default generator independence.
 - Phase 3: `nn::Module::Train/Eval/IsTraining` (recurses through `__pp_*`), CPU + CUDA `DropoutForward/DropoutBackward` (mask `kUINT8`, scale `1/(1-p)`, CUDA Philox stream-bound + p==0 fast path), `autograd::Dropout` Function, `nn::Dropout` module (IsTraining gated), `nn::function::{Rand,Randn,Dropout}` free helpers.
-- Phase 4: full technical report at `docs/generator-design.md` mapping 1:1 to contest §四 — §1 functional correctness verification, §2 PyTorch alignment & behavior analysis, §3 test & reproducibility instructions, §4 §五 acceptance checklist; plus `scripts/check_reproducibility.sh` driving two ctest sweeps and diffing per-test verdicts; plus master-empirical-proof addendum confirming the 10 failures are upstream-only.
+- Phase 4: full technical report at `docs/generator-design.md` in pyramid structure — TL;DR + §五 acceptance checklist up front, then background/approach/results/risks; covers contest §四 deliverables (functional verification §4, PyTorch alignment §5, test & reproducibility §6) with file:line + test-name citations and explicit Fact/Hypothesis/Decision separation for the gemm.cu attribution; plus `scripts/check_reproducibility.sh` driving two ctest sweeps and diffing per-test verdicts; plus master-empirical-proof addendum confirming the 10 failures are upstream-only.
 
 ## Test plan
 - train-server full ctest at HEAD `1307669` (USE_CUDA=ON USE_NCCL=ON Debug): **510 pass / 10 fail / 12 skip / 532 ran (534 - 2 Disabled)** — the 10 failures are the pre-existing upstream `gemm.cu:41` DCHECK aborts (unrelated; commit attribution in §2 below).
@@ -205,7 +205,7 @@ Only `mt19937_64` (the engine type) appears, only inside `CPUGeneratorImpl` — 
 ## Out of scope (filed/notable)
 - gemm.cu:41 `DCHECK_EQ(p.stride_a, 0LL)` introduced by 5dfd4b2e (2026-04-15, upstream): non-batched matmul callers pass non-zero strides, tripping the DCHECK in debug. Pre-existing, surfaces in 7 Matmul + 3 LoRA tests.
 - third_party/gflags requires `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` on modern CMake.
-- BF16/FP16 dropout, LoRA `dropout` field wiring, PyTorch bit-for-bit reproducibility, CUDA graph capture-friendly Philox snapshot — all listed as future work in `docs/generator-design.md` §2.5.
+- BF16/FP16 dropout, LoRA `dropout` field wiring, PyTorch bit-for-bit reproducibility, CUDA graph capture-friendly Philox snapshot — all listed as future work in `docs/generator-design.md` §7 (Risks and follow-ups).
 ```
 
 ---
@@ -266,7 +266,7 @@ Phase 3+4 newcomers (all green on both backends):
 
 ### Phase 4 verification
 
-- `docs/generator-design.md`: full technical report restructured 1:1 to contest §四 — §0 overview, §1 functional correctness verification (per §三(1)-(5) sub-clauses, with file:line + test-name citations for every claim), §2 PyTorch alignment & behavior analysis (interface tables + 9 aligned items + 6 unaligned items + 6 future directions), §3 test/reproducibility (build commands + expected ctest numbers + script usage + master empirical attribution), §4 §五 acceptance checklist with file references.
+- `docs/generator-design.md`: full technical report in pyramid structure (commit `746eeb2`) — TL;DR (3 bullets) + §1 §五 acceptance checklist (10/10 + 5/6) + §2 background/constraints + §3 approach (architecture diagram + decisions-with-alternatives table + file index) + §4 functional correctness verification (single consolidated coverage matrix per §三(1)-(5) with file:line + test-name citations) + §5 PyTorch alignment (interface table + 9 aligned + 5 unaligned items with Fact/Decision columns) + §6 test/reproducibility (commands + expected ctest + script + §6.4 gemm.cu attribution with explicit Fact/Hypothesis/实证/Decision blocks) + §7 risks and follow-ups (6 risks + 6 future directions) + appendix A (spec/notes references).
 - `scripts/check_reproducibility.sh build_cpu` (local CPU-only): `PASS: 34 test outcomes match across two ctest runs`, exit 0.
 - Script error-path verified: stale build (no Generator tests) → `ERROR: no Generator test verdicts captured`, exit 3 (no longer aborts under pipefail).
 - Initial filter regex shipped in `9de4b0e` was wrong (`^test_generator_` matched executable names, not gtest names); fixed in follow-up `edc5265` to match `Generator|ModuleTrainingTest` + tightened verdict regex + `|| true` against empty grep. Reviewer lesson: structural `bash -n` PASS is necessary but not sufficient — script-quality review must run the script end-to-end.
