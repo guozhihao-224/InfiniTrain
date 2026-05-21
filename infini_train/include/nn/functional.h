@@ -2,7 +2,12 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
+
+#include "infini_train/include/datatype.h"
+#include "infini_train/include/device.h"
+#include "infini_train/include/generator.h"
 
 namespace infini_train {
 class Tensor;
@@ -182,5 +187,21 @@ std::shared_ptr<Tensor> Stack(const std::vector<std::shared_ptr<Tensor>> &inputs
 // Returns:
 //   Concatenation of the input tensors.
 std::shared_ptr<Tensor> Concat(const std::vector<std::shared_ptr<Tensor>> &inputs, int64_t dim = 0);
+
+// Returns a tensor filled with random numbers from a uniform distribution on [0, 1).
+//
+// Args:
+//   size: Output tensor shape.
+//   dtype: Element type. FP32 only for now (Phase 3 dtype scope).
+//   device: Target device.
+//   generator: Optional Generator; nullopt -> default_generator(device).
+std::shared_ptr<Tensor> Rand(const std::vector<int64_t> &size, DataType dtype, Device device,
+                             std::optional<Generator> generator = std::nullopt);
+
+// Returns a tensor filled with random numbers from a standard normal distribution N(0, 1).
+//
+// Args/dtype scope: same as Rand.
+std::shared_ptr<Tensor> Randn(const std::vector<int64_t> &size, DataType dtype, Device device,
+                              std::optional<Generator> generator = std::nullopt);
 
 } // namespace infini_train::nn::function

@@ -2,7 +2,10 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
+
+#include "glog/logging.h"
 
 #include "infini_train/include/autograd/activations.h"
 #include "infini_train/include/autograd/elementwise.h"
@@ -10,6 +13,10 @@
 #include "infini_train/include/autograd/reduction.h"
 #include "infini_train/include/autograd/softmax.h"
 #include "infini_train/include/autograd/transform.h"
+#include "infini_train/include/datatype.h"
+#include "infini_train/include/device.h"
+#include "infini_train/include/dispatcher.h"
+#include "infini_train/include/generator.h"
 #include "infini_train/include/nn/init.h"
 #include "infini_train/include/tensor.h"
 
@@ -78,5 +85,25 @@ std::shared_ptr<Tensor> Softmax(const std::shared_ptr<Tensor> &input, int64_t di
 
 std::shared_ptr<Tensor> Sigmoid(const std::shared_ptr<Tensor> &input) {
     return std::make_shared<autograd::Sigmoid>()->Apply({input})[0];
+}
+
+std::shared_ptr<Tensor> Rand(const std::vector<int64_t> &size, DataType dtype, Device device,
+                             std::optional<Generator> generator) {
+    CHECK_EQ(static_cast<int>(dtype), static_cast<int>(DataType::kFLOAT32))
+        << "nn::function::Rand currently only supports FP32";
+    auto t = std::make_shared<Tensor>(size, dtype, device);
+    auto impl = ResolveGenerator(generator, device);
+    Dispatcher::Instance().Call<void>({device.type(), "UniformRandom"}, t, 0.0f, 1.0f, impl.get());
+    return t;
+}
+
+std::shared_ptr<Tensor> Randn(const std::vector<int64_t> &size, DataType dtype, Device device,
+                              std::optional<Generator> generator) {
+    CHECK_EQ(static_cast<int>(dtype), static_cast<int>(DataType::kFLOAT32))
+        << "nn::function::Randn currently only supports FP32";
+    auto t = std::make_shared<Tensor>(size, dtype, device);
+    auto impl = ResolveGenerator(generator, device);
+    Dispatcher::Instance().Call<void>({device.type(), "NormalRandom"}, t, 0.0f, 1.0f, impl.get());
+    return t;
 }
 } // namespace infini_train::nn::function
