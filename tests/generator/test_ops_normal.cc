@@ -26,9 +26,6 @@ std::vector<float> ReadCpuFloats(const std::shared_ptr<Tensor> &t) {
 } // namespace
 
 TEST_P(GeneratorNormalOpTest, SameSeedSameOutput) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA NormalRandom is Phase 2";
-    }
     auto a = std::make_shared<Tensor>(std::vector<int64_t>{16}, DataType::kFLOAT32, GetDevice());
     auto b = std::make_shared<Tensor>(std::vector<int64_t>{16}, DataType::kFLOAT32, GetDevice());
     Generator g(GetDevice());
@@ -40,9 +37,6 @@ TEST_P(GeneratorNormalOpTest, SameSeedSameOutput) {
 }
 
 TEST_P(GeneratorNormalOpTest, MeanCloseToTarget) {
-    if (GetParam() != Device::DeviceType::kCPU) {
-        GTEST_SKIP() << "CUDA NormalRandom is Phase 2";
-    }
     constexpr int kN = 16384;
     auto t = std::make_shared<Tensor>(std::vector<int64_t>{kN}, DataType::kFLOAT32, GetDevice());
     Generator g(GetDevice());
