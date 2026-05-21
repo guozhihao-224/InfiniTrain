@@ -1,3 +1,6 @@
+#include <functional>
+#include <numeric>
+
 #include <cub/cub.cuh>
 
 #include "infini_train/include/common/cuda/common_cuda.h"
